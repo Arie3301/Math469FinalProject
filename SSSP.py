@@ -10,6 +10,14 @@ import csv
 # if h is a heap then heapq.function_name(h, [element_name])
 ##########
 
+#helper function for graph initialization
+def set_edges_to_inf(G):
+    for node1 in G:
+        for node2 in G:
+            if node1 is not node2:
+                if node2 not in G[node1]:
+                    make_weighted_link(G,node1, node2, float('inf'))
+# end of helper functior for graph initialization
 
 # Initialize airline graph
 def make_weighted_link(G, node1, node2, weight):
@@ -41,19 +49,31 @@ def read_airline_graph(vertex_file, edge_file):
         edge_weight = edge_data_line[2]
         make_weighted_link(G, edge_source, edge_target, edge_weight)
     # set unused edges to inf
-    for node1 in G:
-        for node2 in G:
-            if node1 is not node2:
-                if node2 not in G[node1]:
-                    make_weighted_link(G,node1, node2, float('inf'))
+    set_edges_to_inf(G)
     return G, vertices_by_name, vertices_by_number
 
-airlineG, vertices_by_name, vertices_by_number = read_airline_graph('USAir97Vertices.txt', 'USAir97Edges.txt')
+#airlineG, vertices_by_name, vertices_by_number = read_airline_graph('USAir97Vertices.txt', 'USAir97Edges.txt')
 #end of initialize airline graph
 
+#miniG
+def initialize_mini_g():
+    G = {}
+    edge_set = [('0','1',1),('1','2',8),('1','7',9),('1','15',8),('1','16',7),('2','3',5),('2','5',4),
+                ('2','7',6),('3','4',5),('4','6',6),('4','9',3),('5','6',2),('5','7',5),('7','8',5),
+                ('7','11',2),('8','9',7),('8','10',2),('8','12',3),('8','13',3),('10','12',4),
+                ('11','12',2),('11','17',5),('11','15',9),('12','13',2),('12','14',4), ('14','17',9),
+                ('16','17',7)]
+    for source, target, weight in edge_set:
+        make_weighted_link(G,source,target,weight)
+    return G
+
+miniG = initialize_mini_g()
+print(miniG)
+# end of miniG
+
 #Dijkstra
-def dijkstra(G,v):
-    dist_so_far = {}
+def dijkstra(G, v):
+    dist_so_far = []
     dist_so_far[v] = 0
     final_dist = {}
     while len(final_dist) < len(G):
@@ -68,4 +88,32 @@ def dijkstra(G,v):
                 elif final_dist[w] + G[w][x] < dist_so_far[x]:
                     dist_so_far[x] = final_dist[w] + G[w][x]
     return final_dist
+
+def dijkstra2(G, s):
+    distance = {}
+    parent = {}
+    for node in G:
+        distance[node] = float('inf')
+        parent[node] = None
+    queue = []
+    heapq.heapify(queue)
+    heapq.heappush(queue, (0, s))
+    queued_nodes = [s]
+    while len(queue) > 0:
+        current_node = heapq.heappop(queue)
+        queued_nodes.remove(current_node)
+        for neighbor in G[current_node]:
+            if distance[neighbor] > distance[current_node] + G[current_node][neighbor]:
+                distance[neighbor] = distance[current_node] + G[current_node][neighbor]
+                parent[neighbor] = current_node
+                #
+                if neighbor in queued_nodes:
+                    #remove from queue
+                #update queue with neighbor properly
+                #
+    return distance, parent
+
+dis, par = dijkstra2(miniG, '0')
+print(dis)
+print(par)
 # end of Dijkstra
