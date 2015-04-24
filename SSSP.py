@@ -10,16 +10,14 @@ import csv
 # if h is a heap then heapq.function_name(h, [element_name])
 ##########
 
-#helper function for graph initialization
+#helper functions for graph initialization
 def set_edges_to_inf(G):
     for node1 in G:
         for node2 in G:
             if node1 is not node2:
                 if node2 not in G[node1]:
                     make_weighted_link(G,node1, node2, float('inf'))
-# end of helper functior for graph initialization
 
-# Initialize airline graph
 def make_weighted_link(G, node1, node2, weight):
     if node1 not in G:
         G[node1] = {}
@@ -28,7 +26,17 @@ def make_weighted_link(G, node1, node2, weight):
         G[node2] = {}
     G[node2][node1] = weight
 
+def reverse_graph(G):
+    # G must be completely filled for this to work
+    reverse_G= {}
+    for node1 in G:
+        reverse_G[node1] = {}
+        for node2 in G[node1]:
+            reverse_G[node1][node2] = G[node2][node1]
+    return reverse_G
+# end of helper functions for graph initialization
 
+# Initialize airline graph
 def read_airline_graph(vertex_file, edge_file):
     #read in data structures
     tsv_vertices = csv.reader(open(vertex_file), delimiter=" ", quotechar='"', skipinitialspace=True)
@@ -68,52 +76,88 @@ def initialize_mini_g():
     return G
 
 miniG = initialize_mini_g()
-print(miniG)
+reverse_miniG = reverse_graph(miniG)
+#print(miniG)
+#print(reverse_miniG)
 # end of miniG
 
 #Dijkstra
-def dijkstra(G, v):
-    dist_so_far = []
-    dist_so_far[v] = 0
-    final_dist = {}
-    while len(final_dist) < len(G):
-        w = shortest_dist_node(dist_so_far)
-        # lock it down!
-        final_dist[w] = dist_so_far[w]
-        del dist_so_far[w]
-        for x in G[w]:
-            if x not in final_dist:
-                if x not in dist_so_far:
-                    dist_so_far[x] = final_dist[w] + G[w][x]
-                elif final_dist[w] + G[w][x] < dist_so_far[x]:
-                    dist_so_far[x] = final_dist[w] + G[w][x]
-    return final_dist
-
-def dijkstra2(G, s):
+def dijkstra(G, s):
     distance = {}
     parent = {}
     for node in G:
         distance[node] = float('inf')
         parent[node] = None
+    distance[s] = 0
     queue = []
     heapq.heapify(queue)
     heapq.heappush(queue, (0, s))
     queued_nodes = [s]
     while len(queue) > 0:
-        current_node = heapq.heappop(queue)
+        current_node = heapq.heappop(queue)[1]
         queued_nodes.remove(current_node)
         for neighbor in G[current_node]:
             if distance[neighbor] > distance[current_node] + G[current_node][neighbor]:
+                #update queue routine
+                if neighbor in queued_nodes: #remove neighbor from queue if necessary
+                    queue.remove((distance[neighbor], neighbor))
+                    heapq.heapify(queue)
+                    queued_nodes.remove(neighbor)
                 distance[neighbor] = distance[current_node] + G[current_node][neighbor]
                 parent[neighbor] = current_node
-                #
-                if neighbor in queued_nodes:
-                    #remove from queue
-                #update queue with neighbor properly
-                #
+                heapq.heappush(queue, (distance[neighbor], neighbor))
+                queued_nodes.append(neighbor)
     return distance, parent
 
-dis, par = dijkstra2(miniG, '0')
-print(dis)
-print(par)
+dis, par = dijkstra(miniG, '0')
+#print(dis)
+#print(par)
 # end of Dijkstra
+
+# Tuned SWSF
+def tuned_swsf(G, reverse_G, s, distance, parent, updates):
+    # initialization
+    queue = []
+    queued_nodes = []
+    heapq.heapify(queue)
+    labels = distance
+    for source, target, weight in updates:
+        if G[source][target] < weight:  # weight increase
+            G[source][target] = weight
+            if labels[target] > distance[source] + G[source][target]:
+                labels[target] = distance[source] + G[source][target]
+        if G[source][target] > weight:  # weight decrease
+            G[source][target] = weight
+            labels[target] = min(distance[source] + G[source][target], labels[target])
+        if labels[target] is not distance[target]:
+            priority = min(labels[target], distance[target])
+            heapq.heappush(queue, (priority, target, source))
+            queued_nodes.append(target)
+    #main phase
+    while len(queue) > 0:
+        current_pop = heapq.heappop(queue)
+        current_node = current_pop[1]
+        current_parent = current_pop[2]
+        queued_nodes.remove(current_node)
+        if labels[current_node] < distance[current_node]:
+            distance[current_node] = labels[current_node]
+            parent[current_node] = current_parent
+            for neighbor in G[current_node]:
+                if distance[current_node] + G[current_node][neighbor] < labels[neighbor]:
+                    labels[neighbor] = distance[current_node] + G[current_node][neighbor]
+                    # heap update routine
+                    if neighbor in queued_nodes: #remove neighbor from queue if necessary
+                        queue.remove((distance[neighbor], neighbor))
+                        heapq.heapify(queue)
+                        queued_nodes.remove(neighbor)
+                    priority = min(labels[neighbor], distance[neighbor])
+                    heapq.heappush(queue, (priority, neighbor))
+                    queued_nodes.append(neighbor)
+        if labels[current_node] > distance[current_node]:
+            distance_old = distance[current_node]
+            distance[current_node] = float('inf')
+            #labels[current_node] =
+            # notes to self: Trying set labels[current_node] to con(v) with reverseG. Also wanting to make sure that
+            # parent gets carried along properly in the queue and that prospective parents get locked down properly.
+
+# end of Tuned SWSF
