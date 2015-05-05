@@ -139,10 +139,10 @@ def tuned_swsf(G, reverse_G, distance, parent, updates, directed):
                 reverse_G[source][target] = weight
                 # set source to be the node closer to s
                 if distance[target] < distance[source]:
-                    #temp = target
+                    temp = target
                     target = source
-                    #source = temp
-             # set labels[current_node] to its consistent value
+                    source = temp
+            # set labels[current_node] to its consistent value
             labels[target] = float('inf')
             parent_candidate = None
             for source2 in reverse_G[target]:
@@ -208,22 +208,147 @@ def tuned_swsf(G, reverse_G, distance, parent, updates, directed):
 ###testing SWSF
 miniG1 = initialize_mini_g()
 reverse_miniG1 = reverse_graph(miniG1)
-#print(miniG1)
+#print("initial miniG:", miniG1)
+# print(reverse_miniG)
+distance1, parent1 = dijkstra(miniG1, '0')
+#print("initial distance:", distance1)
+#print("initial parents:", parent1)
+
+updates = [('7', '1', float('inf'))]
+tuned_swsf(miniG1, reverse_miniG1, distance1, parent1, updates, False)
+print("SWSF was run.")
+print("New parents:", parent1)
+print("New distance:", distance1)
+#print("New miniG:", miniG1)
+### end of testing SWSF
+
+
+# First Incremental Dijkstra
+def first_incremental_dijkstra(G, reverse_G, distance, parent, updates, directed):
+    # initialization
+    queue = []
+    heapq.heapify(queue)
+    for source, target, weight in updates:
+        delta = G[source][target] - weight
+        if delta < 0:  # Weight increase
+            # update G
+            G[source][target] = weight
+            reverse_G[target][source] = weight
+            if not directed:
+                G[target][source] = weight
+                reverse_G[source][target] = weight
+                # set source to be the node closer to s
+                if distance[target] < distance[source]:
+                    temp = target
+                    target = source
+                    source = temp
+            if parent[target] == source:
+                subtree = get_subtree(parent, target)
+                for child in subtree:
+                    distance[child] -= delta
+                for child in subtree:
+                    for in_node in reverse_G[child]:
+                        if distance[child] > distance[in_node] + reverse_G[child][in_node] and parent[in_node] is not child:
+                            new_distance = distance[in_node] + reverse_G[child][in_node]
+                            # heap update routine
+                            update_heap(queue, new_distance, child, in_node)
+        if delta > 0:  # Weight decrease
+            # update G
+            G[source][target] = weight
+            reverse_G[target][source] = weight
+            if not directed:
+                G[target][source] = weight
+                reverse_G[source][target] = weight
+                # set source to be the node closer to s
+                if distance[target] < distance[source]:
+                    temp = target
+                    target = source
+                    source = temp
+            if distance[target] > distance[source] + G[source][target]:
+                delta_prime = distance[target] - (distance[source] + G[source][target])
+                parent[target] = source
+                subtree = get_subtree(parent, target)
+                for child in subtree:
+                    distance[child] = distance[child] - delta_prime
+                for child in subtree:
+                    for out_node in G[child]:
+                        if distance[out_node] > distance[child] + G[child][out_node]:
+                            new_distance = distance[child] + G[child][out_node]
+                            new_parent = child
+                            # heap update routine
+                            update_heap(queue, new_distance, out_node, new_parent)
+    # Main Phase
+    while len(queue) > 0:
+        current_pop = heapq.heappop(queue)
+        current_distance = current_pop[0]
+        current_node = current_pop[1]
+        current_parent = current_pop[2]
+        delta = current_distance - distance[current_node]
+        if delta < 0:
+            parent[current_node] = current_parent
+            distance[current_node] = current_distance
+            for neighbor in G[current_node]:
+                if distance[neighbor] > distance[current_node] + G[current_node][neighbor]:
+                    new_distance = distance[current_node] + G[current_node][neighbor]
+                    new_parent = current_node
+                    update_heap(queue, new_distance, neighbor, new_parent)
+
+
+# Helper function that returns node v and all its children in the SPT
+def get_subtree(parent, v):
+    children = [v]
+    list1 = [v]
+    while len(list1) > 0:
+        current_node = list1.pop()
+        for node in parent:
+            if parent[node] == current_node:
+                children.append(node)
+                list1.append(node)
+    return children
+
+
+def update_heap(queue, node_priority, node, node_parent):
+    old_update = None
+    for my_tuple in queue:
+        if my_tuple[1] == node:
+            old_update = my_tuple
+    if old_update is None:
+        heapq.heappush(queue, (node_priority, node, node_parent))
+        return 0
+    else:
+        if old_update[0] > node_priority:
+            queue.remove(old_update)
+            heapq.heapify(queue)
+            heapq.heappush(queue, (node_priority, node, node_parent))
+            return 0
+        else:
+            return 0
+
+
+
+# End of First Incremental Dijkstra
+
+#testing First Incremental Dijkstra
+
+miniG2 = initialize_mini_g()
+reverse_miniG2 = reverse_graph(miniG2)
+#print("recomputed mini_G")
+#print(miniG2)
 #print(reverse_miniG)
 
-distance1, parent1 = dijkstra(miniG1, '0')
-#print(distance1)
-#print(parent1)
+distance2, parent2 = dijkstra(miniG2, '0')
+#print(distance2)
+#print(parent2)
+#print("initial distance:", distance2)
+#print("initial parents:", parent2)
 
-#updates = [('7', '1', 1)]
-#miniG2, distance2, parent2 = tuned_swsf(miniG1, reverse_miniG1, distance1, parent1, updates)
-
-#print(miniG1)
-#print(distance1)
-#print(parent1)
-#tuned_swsf(miniG1, reverse_miniG1, distance1, parent1, updates, False)
-#print(parent1)
-#print(distance1)
-#print(miniG1)
-
-### end of testing SWSF
+updates = [('7', '1', float('inf'))]
+first_incremental_dijkstra(miniG2, reverse_miniG2, distance2, parent2, updates, False)
+print("Incremental Dijkstra was run.")
+print("New parents:", parent2)
+print("New distance:", distance2)
+#print("New miniG:", miniG2)
+print("graphs equal: ", miniG2 == miniG1)
+print("parents equal: ", parent1 == parent2)
+print("distances equal: ", distance1 == distance2)
+# End of testing First Incremental Dijkstra
