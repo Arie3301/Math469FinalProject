@@ -75,12 +75,9 @@ def initialize_mini_g():
     for source, target, weight in edge_set:
         make_weighted_link(G,source,target,weight)
     return G
-
-
 # end of miniG
 
 #Dijkstra
-
 def dijkstra(G, s):
     distance = {}
     parent = {}
@@ -127,7 +124,6 @@ def tuned_swsf(G, reverse_G, distance, parent, updates, directed):
                     source = temp
             if labels[target] > distance[source] + G[source][target]:
                 labels[target] = distance[source] + G[source][target]
-                parent_candidate = source
         if G[source][target] < weight:  # weight increase
             G[source][target] = weight
             reverse_G[target][source] = weight
@@ -141,84 +137,59 @@ def tuned_swsf(G, reverse_G, distance, parent, updates, directed):
                     source = temp
             # set labels[current_node] to its consistent value
             labels[target] = float('inf')
-            parent_candidate = None
             for source2 in reverse_G[target]:  # nodes with edges incoming to target
                 if distance[source2] + reverse_G[target][source2] < labels[target]:
                     labels[target] = distance[source2] + reverse_G[target][source2]
-                    parent_candidate = source2
         if labels[target] is not distance[target]:
-            priority = min(labels[target], distance[target])
-            update_heap(queue, priority, target, parent_candidate)
+            queue.append(target)
     #main phase
     while len(queue) > 0:
-        synchronize_heap(queue,distance, labels)
-        current_pop = heapq.heappop(queue)
-        current_node = current_pop[1]
-        current_parent = current_pop[2]
-        if labels[current_node] < distance[current_node]:  # current node has found a better path
+        current_node, current_priority = queue_extract(queue, distance, labels)
+        queue.remove(current_node)
+        if labels[current_node] <= distance[current_node]:  # current node has found a better path
+            # set distance and parent attribute
             distance[current_node] = labels[current_node]
-            parent[current_node] = current_parent
+            for potential_parent in reverse_G[current_node]:
+                if distance[potential_parent] == labels[potential_parent] and distance[potential_parent] + reverse_G[current_node][potential_parent] == labels[current_node]:
+                    parent[current_node] = potential_parent
+                    print(current_node, " gets parent ", potential_parent)
+                else:
+                    print(current_node, " does not get parent ", potential_parent)
+            # append neighbors to queue that may find shorter distance
             for neighbor in G[current_node]:
                 if distance[current_node] + G[current_node][neighbor] < labels[neighbor]:  # neighbor can do better
                     labels[neighbor] = distance[current_node] + G[current_node][neighbor]
-                    # heap update routine
-                    priority = min(labels[neighbor], distance[neighbor])
-                    update_heap(queue, priority, neighbor, current_node)
+                    queue.append(neighbor)
         if labels[current_node] > distance[current_node]:  # current node has not found a better path
             distance_old = distance[current_node]
             distance[current_node] = float('inf')
             # set labels[current_node] to its consistent value
             labels[current_node] = float('inf')
-            parent_candidate = None
             for source in reverse_G[current_node]:
                 if distance[source] + reverse_G[current_node][source] < labels[current_node]:
                     labels[current_node] = distance[source] + reverse_G[current_node][source]
-                    parent_candidate = source
-            # heap update routine
-            update_heap(queue, labels[current_node], current_node, parent_candidate)
+            queue.append(current_node)
             # for edge such that it routed through current_node, recompute best shortest path and insert into heap.
             for neighbor in G[current_node]:
-                if distance_old + G[current_node][neighbor] == distance[neighbor]:
+                if distance_old + G[current_node][neighbor] == distance[neighbor] or distance_old + G[current_node][neighbor] == labels[neighbor]:
                     # set labels[neighbor] to its consistent value
                     labels[neighbor] = float('inf')
-                    parent_of_neighbor = None
                     for source3 in reverse_G[neighbor]:
                         if distance[source3] + reverse_G[neighbor][source3] < labels[neighbor]:
                             labels[neighbor] = distance[source3] + reverse_G[neighbor][source3]
-                            parent_of_neighbor = source3
-                    # heap update routine
-                    priority = min(labels[neighbor], distance[neighbor])
-                    update_heap(queue, priority, neighbor, parent_of_neighbor)
+                    queue.append(neighbor)
 
 
-def update_heap(queue, node_priority, node, node_parent):
-    old_update = None
-    for my_tuple in queue:
-        if my_tuple[1] == node:
-            old_update = my_tuple
-    if old_update is None:
-        heapq.heappush(queue, (node_priority, node, node_parent))
-        return 0
-    else:
-        if old_update[0] > node_priority:
-            queue.remove(old_update)
-            heapq.heapify(queue)
-            heapq.heappush(queue, (node_priority, node, node_parent))
-            return 0
-        else:
-            return 0
-
-
-def synchronize_heap(queue, distance, labels):
-    for my_tuple in queue:
-        current_node = my_tuple[1]
-        current_parent = my_tuple[2]
-        current_priority = min(distance[current_node], labels[current_parent])
-        queue.remove(my_tuple)
-        queue.append((current_priority, current_node, current_parent))
-    heapq.heapify(queue)
-    return 0
-
+def queue_extract(queue, distance, labels):
+    queue = list(set(queue))
+    current_node = None
+    current_priority = float('inf')
+    for node in queue:
+        if min(distance[node], labels[node]) < current_priority:
+            current_priority = min(distance[node], labels[node])
+            current_node = node
+    queue.remove(current_node)
+    return current_node, current_priority
 # end of Tuned SWSF
 
 ###testing SWSF
@@ -323,10 +294,25 @@ def get_subtree(parent, v):
     return children
 
 
+def update_heap(queue, node_priority, node, node_parent):
+    old_update = None
+    for my_tuple in queue:
+        if my_tuple[1] == node:
+            old_update = my_tuple
+    if old_update is None:
+        heapq.heappush(queue, (node_priority, node, node_parent))
+        return 0
+    else:
+        if old_update[0] > node_priority:
+            queue.remove(old_update)
+            heapq.heapify(queue)
+            heapq.heappush(queue, (node_priority, node, node_parent))
+            return 0
+        else:
+            return 0
 # End of First Incremental Dijkstra
 
 #testing First Incremental Dijkstra
-
 miniG2 = initialize_mini_g()
 reverse_miniG2 = reverse_graph(miniG2)
 #print("recomputed mini_G")
