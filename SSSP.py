@@ -3,21 +3,18 @@ __author__ = 'ArieSlobbeT440'
 
 import heapq
 import csv
+import random
 
 ##########
-# NOTES
-# float('inf') / float('-inf')
-# if h is a heap then heapq.function_name(h, [element_name])
+# Hi Andrew!
+#
+# Please feel free to run the code after you're done looking it over. I have written a little
+# 'demonstration' for you, which run some examples and discuss them.
+#
+# Arie
 ##########
 
 #helper functions for graph initialization
-def set_edges_to_inf(G):
-    for node1 in G:
-        for node2 in G:
-            if node1 is not node2:
-                if node2 not in G[node1]:
-                    make_weighted_link(G,node1, node2, float('inf'))
-
 def make_weighted_link(G, node1, node2, weight):
     if node1 not in G:
         G[node1] = {}
@@ -25,6 +22,7 @@ def make_weighted_link(G, node1, node2, weight):
     if node2 not in G:
         G[node2] = {}
     G[node2][node1] = weight
+
 
 def reverse_graph(G):
     # G must be completely filled for this to work
@@ -54,16 +52,15 @@ def read_airline_graph(vertex_file, edge_file):
     for edge_data_line in tsv_edges:
         edge_source = edge_data_line[0]
         edge_target = edge_data_line[1]
-        edge_weight = edge_data_line[2]
+        edge_weight = float(edge_data_line[2])
         make_weighted_link(G, edge_source, edge_target, edge_weight)
     # set unused edges to inf
-    set_edges_to_inf(G)
+    #set_edges_to_inf(G)
     return G, vertices_by_name, vertices_by_number
+# End of Initialize Airline Graph
 
-#airlineG, vertices_by_name, vertices_by_number = read_airline_graph('USAir97Vertices.txt', 'USAir97Edges.txt')
-#end of initialize airline graph
 
-#miniG
+# MiniG
 def initialize_mini_g():
     G = {}
     edge_set = [('0','1',0),('1','2',8),('1','7',9),('1','15',8),('1','16',7),('2','3',5),('2','5',4),
@@ -71,13 +68,12 @@ def initialize_mini_g():
                 ('7','11',2),('8','9',7),('8','10',2),('8','12',3),('8','13',3),('10','12',4),
                 ('11','12',2),('11','17',5),('11','15',9),('12','13',2),('12','14',4), ('14','17',9),
                 ('16','17',7)]
-    #edge_set = [('0', '1', 0), ('1', '2', 1), ('1', '5', 6), ('2', '3', 2), ('3', '4', 2), ('4', '5', 2)]
     for source, target, weight in edge_set:
-        make_weighted_link(G,source,target,weight)
+        make_weighted_link(G, source, target, weight)
     return G
-# end of miniG
+# End of MiniG
 
-#Dijkstra
+# Dijkstra
 def dijkstra(G, s):
     distance = {}
     parent = {}
@@ -103,7 +99,7 @@ def dijkstra(G, s):
                 parent[neighbor] = current_node
                 heapq.heappush(queue, (distance[neighbor], neighbor))
     return distance, parent
-# end of Dijkstra
+# End of Dijkstra
 
 # Tuned SWSF
 def tuned_swsf(G, reverse_G, distance, parent, updates, directed):
@@ -152,9 +148,6 @@ def tuned_swsf(G, reverse_G, distance, parent, updates, directed):
             for potential_parent in reverse_G[current_node]:
                 if distance[potential_parent] == labels[potential_parent] and distance[potential_parent] + reverse_G[current_node][potential_parent] == labels[current_node]:
                     parent[current_node] = potential_parent
-                    print(current_node, " gets parent ", potential_parent)
-                else:
-                    print(current_node, " does not get parent ", potential_parent)
             # append neighbors to queue that may find shorter distance
             for neighbor in G[current_node]:
                 if distance[current_node] + G[current_node][neighbor] < labels[neighbor]:  # neighbor can do better
@@ -179,7 +172,7 @@ def tuned_swsf(G, reverse_G, distance, parent, updates, directed):
                             labels[neighbor] = distance[source3] + reverse_G[neighbor][source3]
                     queue.append(neighbor)
 
-
+# Helper function for the priority queue of Tuned SWSF
 def queue_extract(queue, distance, labels):
     queue = list(set(queue))
     current_node = None
@@ -191,24 +184,6 @@ def queue_extract(queue, distance, labels):
     queue.remove(current_node)
     return current_node, current_priority
 # end of Tuned SWSF
-
-###testing SWSF
-miniG1 = initialize_mini_g()
-reverse_miniG1 = reverse_graph(miniG1)
-#print("initial miniG:", miniG1)
-# print(reverse_miniG)
-distance1, parent1 = dijkstra(miniG1, '0')
-#print("initial distance:", distance1)
-#print("initial parents:", parent1)
-
-updates = [('7', '1', float('inf'))]
-tuned_swsf(miniG1, reverse_miniG1, distance1, parent1, updates, False)
-print("SWSF was run.")
-print("New parents:", parent1)
-print("New distance:", distance1)
-#print("New miniG:", miniG1)
-### end of testing SWSF
-
 
 # First Incremental Dijkstra
 def first_incremental_dijkstra(G, reverse_G, distance, parent, updates, directed):
@@ -294,6 +269,7 @@ def get_subtree(parent, v):
     return children
 
 
+# Helper function for the priority queue of First Incremental Dijkstra
 def update_heap(queue, node_priority, node, node_parent):
     old_update = None
     for my_tuple in queue:
@@ -310,28 +286,97 @@ def update_heap(queue, node_priority, node, node_parent):
             return 0
         else:
             return 0
+
+
+# Helper function that runs the main function once for updates that increase edge weights, and once for
+# updates that decrease edge weights.
+def first_inc_dijkstra_batch_init(G, reverse_G, distance, parent, updates, directed):
+    increases = []
+    decreases = []
+    for source, target, weight in updates:
+        if G[source][target] > weight:
+            decreases.append((source, target, weight))
+        else:
+            increases.append((source, target, weight))
+    first_incremental_dijkstra(G, reverse_G, distance, parent, increases, directed)
+    first_incremental_dijkstra(G, reverse_G, distance, parent, decreases, directed)
 # End of First Incremental Dijkstra
 
-#testing First Incremental Dijkstra
+# Helper functions for data exploration
+def dictionary_with_names(distance, vertices_by_number):
+    my_dict = {}
+    for node_number in distance:
+        my_dict[vertices_by_number[node_number]] = distance[node_number]
+    return my_dict
+# End of Helper functions for data exploration
+
+
+# Code Demonstration
+miniG1 = initialize_mini_g()
+reverse_miniG1 = reverse_graph(miniG1)
+print("MiniG contains the graph that was used during the presentation to demonstrate the workings of the algorithms.")
+print("MiniG:", miniG1)
+print("We let '0' be the source node and run Dijkstra to find the parents and distances")
+distance1, parent1 = dijkstra(miniG1, '0')
+print("Initial distances:", distance1)
+print("Initial parents:", parent1)
+print("Next, we apply a batch of edge updates and run Tuned SWSF as well as First Incremental Dijkstra.")
+print("We will set the weight of edge (15, 11) from 9 down to 2, and the weight of edge (1, 16) from 7 to 17.")
+
+updates = [('15', '11', 2), ('1', '16', 17)]
+tuned_swsf(miniG1, reverse_miniG1, distance1, parent1, updates, False)
+print("SWSF was run.")
+print("New parents:", parent1)
+print("New distance:", distance1)
+
 miniG2 = initialize_mini_g()
 reverse_miniG2 = reverse_graph(miniG2)
-#print("recomputed mini_G")
-#print(miniG2)
-#print(reverse_miniG)
-
 distance2, parent2 = dijkstra(miniG2, '0')
-#print(distance2)
-#print(parent2)
-#print("initial distance:", distance2)
-#print("initial parents:", parent2)
-
-updates = [('7', '1', float('inf'))]
-first_incremental_dijkstra(miniG2, reverse_miniG2, distance2, parent2, updates, False)
+updates = [('15', '11', 2), ('1', '16', 17)]
+first_inc_dijkstra_batch_init(miniG2, reverse_miniG2, distance2, parent2, updates, False)
 print("Incremental Dijkstra was run.")
 print("New parents:", parent2)
 print("New distance:", distance2)
-#print("New miniG:", miniG2)
-print("graphs equal: ", miniG2 == miniG1)
 print("parents equal: ", parent1 == parent2)
 print("distances equal: ", distance1 == distance2)
-# End of testing First Incremental Dijkstra
+
+print("-----------------------------------------------------------------------------------------------------------------------------------------")
+
+print("Next, we test our algorithms on the US Air Lines data set which was retrieved from the Pajek data sets page. Unfortunately, the data set")
+print("does not come with any documentation. We know that n = 332 and m = 2126. It was not specified what the weights are supposed to represent.")
+print("The weights range from 0.0009 to 0.5326, so it is unlikely that they represent some kind of normalized value. From manual inspection, it")
+print("does seem like the weights correspond to physical distance between two airports.")
+airlineG, vertices_by_name, vertices_by_number = read_airline_graph('USAir97Vertices.txt', 'USAir97Edges.txt')
+reverse_airlineG = reverse_graph(airlineG)
+distance1, parent1 = dijkstra(airlineG, '2')
+distance_for_printout = dictionary_with_names(distance1, vertices_by_number)
+print("We run Dijkstra on the data set with the source node fixed at 'Deadhorse', which is an airfield belonging to a remote outpost on the icy")
+print("northern shore of Alaska that goes by the same depressing name (en.wikipedia.org/wiki/Deadhorse,_Alaska). I'd like to visit there sometime.")
+print("During summer, of course.")
+print("Initial Distances:", distance1)
+print("Initial parents:", parent1)
+print("The main connection from Deadhorse to the rest of the US is through its connection with Anchorage International Airport. We set the distance")
+print("to Anchorage from 0.0866 to 0.0900 and recompute the shortest paths.")
+updates = [('2', '8', 0.09)]
+tuned_swsf(airlineG, reverse_airlineG, distance1, parent1, updates, False)
+print("SWSF was run.")
+print("New parents:", parent1)
+print("New distance:", distance1)
+
+airlineG2, vertices_by_name2, vertices_by_number2 = read_airline_graph('USAir97Vertices.txt', 'USAir97Edges.txt')
+reverse_airlineG2 = reverse_graph(airlineG2)
+distance2, parent2 = dijkstra(airlineG2, '2')
+updates = [('2', '8', 0.09)]
+first_inc_dijkstra_batch_init(airlineG2, reverse_airlineG2, distance2, parent2, updates, False)
+print("Incremental Dijkstra was run.")
+print("New parents:", parent2)
+print("New distance:", distance2)
+print("parents equal: ", parent1 == parent2)
+print("distances equal: ", distance1 == distance2)
+
+print("------------------------------------------------------------------------------------------------------------------------------------------")
+print("When I run the algorithms the distance dictionaries are always the same. This is of course supposed to be the case, since")
+print("the algorithms are supposed to find the unique shortest distance to each node. However, the parents dictionaries are NOT equal for Tuned")
+print("SWSF and Incremental Dijkstra. What we are seeing is thus that shortest paths are not unique in the airline network, and that our algo-")
+print("rithms are finding different shortest-path trees.")
+# End of Code Demonstration
